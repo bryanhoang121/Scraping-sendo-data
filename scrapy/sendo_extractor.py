@@ -77,66 +77,59 @@ def fetch_product_details(product_url, render_attempts=3):
                 unique_combinations = set()  # To track unique results
 
                 # Locate the parent <div> for colors
-                color_container = WebDriverWait(driver, 10).until(
-                    EC.presence_of_element_located((By.XPATH, '(//div[contains(@class, "d7ed-TmQak_")])[1]'))
-                )
-
-                # Iterate over each color
-                while True:
+                try:
+                    color_container = WebDriverWait(driver, 10).until(
+                        EC.presence_of_element_located((By.XPATH, '(//div[contains(@class, "d7ed-TmQak_")])[1]'))
+                    )
                     color_buttons = color_container.find_elements(By.XPATH, './/button[@aria-label="select-attribute"]')
                     print(f"Found {len(color_buttons)} color buttons.")
-                    
-                    for i in range(len(color_buttons)):
-                        #Dealing with notification
-                        if not notification_handled:  # Check if notification has been handled
-                            try:
-                                print("Checking for the 'How to enable notifications' modal...")
-                                # Locate the close button (span with role="presentation")
-                                modal_close_button = WebDriverWait(driver, 10).until(
-                                    EC.element_to_be_clickable((By.XPATH, "//span[@role='presentation']"))
-                                )
-                                modal_close_button.click()  # Click the close button
-                                print("'How to enable notifications' modal closed successfully.")
-                                notification_handled = True  # Mark as handled
-                            except Exception as e:
-                                print("No 'How to enable notifications' modal detected or failed to close it:", e)
-                        # Click the current color button
-                        color_buttons[i].click()
-                        time.sleep(2)  # Wait for the UI to update 
+                except Exception as e:
+                    print("No color container found or failed to load colors:", e)
+                    color_buttons = []
 
-                        # Extract the updated color text displayed on the page
+                # Locate the parent <div> for types
+                try:
+                    type_container = WebDriverWait(driver, 10).until(
+                        EC.presence_of_element_located((By.XPATH, '(//div[contains(@class, "d7ed-TmQak_")])[2]'))
+                    )
+                    type_buttons = type_container.find_elements(By.XPATH, './/button[@aria-label="select-attribute"]')
+                    print(f"Found {len(type_buttons)} type buttons.")
+                except Exception as e:
+                    print("No type container found or failed to load types:", e)
+                    type_buttons = []
+
+                # Iterate over each color
+                for i, color_button in enumerate(color_buttons):
+                    # Dealing with notification
+                    if not notification_handled:
                         try:
-                            color_text_element = WebDriverWait(driver, 10).until(
-                                EC.presence_of_element_located((By.XPATH, '(//div[@id="select-attribute"]//div[contains(@class, "_3141-xfVUgd")])[1]//span[contains(@class, "d7ed-AHa8cD")]'))
+                            modal_close_button = WebDriverWait(driver, 10).until(
+                                EC.element_to_be_clickable((By.XPATH, "//span[@role='presentation']"))
                             )
-                            color_text = color_text_element.text.strip()
-                            print(f"Selected color: {color_text}")
+                            modal_close_button.click()
+                            print("'How to enable notifications' modal closed successfully.")
+                            notification_handled = True
                         except Exception as e:
-                            print(f"Failed to fetch the displayed color text: {e}")
-                            color_text = "N/A"
+                            print("No 'How to enable notifications' modal detected or failed to close it:", e)
 
-                        # Locate the parent <div> for types
-                        type_container = WebDriverWait(driver, 10).until(
-                            EC.presence_of_element_located((By.XPATH, '(//div[contains(@class, "d7ed-TmQak_")])[2]'))
+                    # Click the current color button
+                    color_button.click()
+                    time.sleep(2)  # Wait for the UI to update
+
+                    # Extract the updated color text displayed on the page
+                    try:
+                        color_text_element = WebDriverWait(driver, 10).until(
+                            EC.presence_of_element_located((By.XPATH, '(//div[@id="select-attribute"]//div[contains(@class, "_3141-xfVUgd")])[1]//span[contains(@class, "d7ed-AHa8cD")]'))
                         )
-                        type_buttons = type_container.find_elements(By.XPATH, './/button[@aria-label="select-attribute"]')
+                        color_text = color_text_element.text.strip()
+                        print(f"Selected color: {color_text}")
+                    except Exception as e:
+                        print(f"Failed to fetch the displayed color text: {e}")
+                        color_text = "N/A"
 
-                        # Iterate over each type
+                    # If types are available, iterate over them
+                    if type_buttons:
                         for type_button in type_buttons:
-                            #Dealing with notification
-                            if not notification_handled:  # Check if notification has been handled
-                                try:
-                                    print("Checking for the 'How to enable notifications' modal...")
-                                    # Locate the close button (span with role="presentation")
-                                    modal_close_button = WebDriverWait(driver, 10).until(
-                                        EC.element_to_be_clickable((By.XPATH, "//span[@role='presentation']"))
-                                    )
-                                    modal_close_button.click()  # Click the close button
-                                    print("'How to enable notifications' modal closed successfully.")
-                                    notification_handled = True  # Mark as handled
-                                except Exception as e:
-                                    print("No 'How to enable notifications' modal detected or failed to close it:", e)
-                            # Skip disabled buttons
                             if not type_button.is_enabled():
                                 print(f"Skipping disabled type button for color {color_text}.")
                                 continue
@@ -156,7 +149,7 @@ def fetch_product_details(product_url, render_attempts=3):
                                 print(f"Failed to fetch the displayed type text: {e}")
                                 type_text = "N/A"
 
-                            # Extract the price after selecting color and type
+                            # Extract the price for the selected color and type
                             try:
                                 price_element = WebDriverWait(driver, 10).until(
                                     EC.presence_of_element_located((By.XPATH, '//div[contains(@class, "_3141-j_1grA")]//span[contains(@class, "d7ed-giDKVr")]'))
@@ -164,23 +157,79 @@ def fetch_product_details(product_url, render_attempts=3):
                                 price = price_element.text.strip()
                                 print(f"Price for {color_text} and {type_text}: {price}")
 
-                                # Create a unique key for this combination
+                                # Add the combination if it's unique
                                 combination_key = (color_text, type_text, price)
                                 if combination_key not in unique_combinations:
                                     unique_combinations.add(combination_key)
-                                    combinations.append({
+                                    combinations.append(json.loads(json.dumps({
                                         "color": color_text,
                                         "type": type_text,
                                         "price": price
-                                    })
+                                    })))
                             except Exception as e:
                                 print(f"Failed to fetch price for {color_text} and {type_text}: {e}")
+                    else:
+                        # Handle case where there are no types, just colors
+                        try:
+                            price_element = WebDriverWait(driver, 10).until(
+                                EC.presence_of_element_located((By.XPATH, '//div[contains(@class, "_3141-j_1grA")]//span[contains(@class, "d7ed-giDKVr")]'))
+                            )
+                            price = price_element.text.strip()
+                            print(f"Price for {color_text}: {price}")
 
-                            # Clicl one more time the type selection after processing all types for the current color
-                            type_button.click()
-                        
+                            # Add the combination if it's unique
+                            combination_key = (color_text, "N/A", price)
+                            if combination_key not in unique_combinations:
+                                unique_combinations.add(combination_key)
+                                combinations.append({
+                                    "color": color_text,
+                                    "type": "N/A",
+                                    "price": price
+                                })
+                        except Exception as e:
+                            print(f"Failed to fetch price for {color_text} (no type): {e}")
 
-                    break  # Exit loop after processing all colors
+                # Handle case where there are types but no colors
+                if not color_buttons and type_buttons:
+                    for type_button in type_buttons:
+                        if not type_button.is_enabled():
+                            print("Skipping disabled type button.")
+                            continue
+
+                        type_button.click()
+                        time.sleep(2)  # Wait for the UI to update
+
+                        try:
+                            type_text_element = WebDriverWait(driver, 10).until(
+                                EC.presence_of_element_located((By.XPATH, '(//div[@id="select-attribute"]//div[contains(@class, "_3141-xfVUgd")])[2]//span[contains(@class, "d7ed-AHa8cD")]'))
+                            )
+                            type_text = type_text_element.text.strip()
+                            print(f"Selected type: {type_text}")
+                        except Exception as e:
+                            print(f"Failed to fetch the displayed type text: {e}")
+                            type_text = "N/A"
+
+                        # Extract price for the type
+                        try:
+                            price_element = WebDriverWait(driver, 10).until(
+                                EC.presence_of_element_located((By.XPATH, '//div[contains(@class, "_3141-j_1grA")]//span[contains(@class, "d7ed-giDKVr")]'))
+                            )
+                            price = price_element.text.strip()
+                            print(f"Price for type {type_text}: {price}")
+
+                            # Add the combination if it's unique
+                            combination_key = ("N/A", type_text, price)
+                            if combination_key not in unique_combinations:
+                                unique_combinations.add(combination_key)
+                                combinations.append({
+                                    "color": "N/A",
+                                    "type": type_text,
+                                    "price": price
+                                })
+                                # Ensure `combinations` is serialized into valid JSON
+                                combinations = json.loads(json.dumps(combinations))
+                        except Exception as e:
+                            print(f"Failed to fetch price for type {type_text}: {e}")
 
                 # Print all unique combinations
                 print("All unique color-type combinations and prices:")
@@ -328,28 +377,14 @@ def fetch_product_details(product_url, render_attempts=3):
                     driver.quit()
             # Combine all text into a single paragraph
             def combine_description_data(description_text, table_data, list_data, extracted_text):
-                # Extract table values
-                table_values = []
-                for row in table_data:
-                    if isinstance(row, dict):  # If row is a dictionary
-                        table_values.extend(row.values())
-                    else:  # If row is a list
-                        table_values.extend(row)
-
-                # Flatten list data
-                list_values = []
-                for item in list_data:
-                    if "text" in item:
-                        list_values.append(item["text"])
-                    if "sublist" in item:
-                        list_values.extend(item["sublist"])
+                # Ensure all inputs are strings and sanitize single quotes
+                description_text = description_text.replace("'", '"').strip()
+                table_values = [str(value).replace("'", '"').strip() for row in table_data for value in (row.values() if isinstance(row, dict) else row)]
+                list_values = [str(item.get("text", "")).replace("'", '"').strip() for item in list_data]
 
                 # Combine all text parts
                 combined_paragraph = " ".join(
-                    [description_text.strip()] +
-                    table_values +
-                    list_values +
-                    extracted_text
+                    [description_text] + table_values + list_values + [text.replace("'", '"').strip() for text in extracted_text]
                 ).strip()
 
                 return combined_paragraph
@@ -370,7 +405,7 @@ def fetch_product_details(product_url, render_attempts=3):
                 "sold": product_sold,
                 "rating": rating_value,
                 "rating_count": rating_count,
-                "product_option": combinations,
+                "product_option": json.loads(json.dumps(combinations)),
                 "description": combined_paragraph,
                 "url": product_url
                 
@@ -379,13 +414,13 @@ def fetch_product_details(product_url, render_attempts=3):
     except Exception as e:
         print(f"Error fetching product details for {product_url}: {e}")
         return {
-            "name": "N/A",
-            "price_range": "N/A",
-            "brand": "N/A",
-            "sold": "N/A",         
-            "rating": "N/A",
-            "rating_count": "N/A",
-            "product_option": "N/A",
-             "description": "N/A",
+            "name": product_name,
+            "price_range": product_price_range,
+            "brand": product_brand,
+            "sold": product_sold,
+            "rating": rating_value,
+            "rating_count": rating_count,
+            "product_option": json.loads(json.dumps(combinations)),  # Ensure valid JSON
+            "description": combined_paragraph.replace("'", '"'),  # Sanitize single quotes
             "url": product_url
         }
